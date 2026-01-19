@@ -1,13 +1,24 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from pypdf import PdfReader
 import io
-import ollama  # <--- NEW LIBRARY
-import json
+import ollama
+import re
+import datetime
+
+# --- DATABASE IMPORTS ---
+# Ensure database.py and models.py exist in the same folder
+from sqlalchemy.orm import Session
+from database import SessionLocal, engine
+import models
+
+# Create database tables automatically
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# --- CORS MIDDLEWARE ---
+# --- CORS SETUP ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,7 +27,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- HELPER: Extract Text ---
+# --- DATABASE DEPENDENCY ---
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# --- HELPER: PDF EXTRACTION ---
 def extract_text_from_pdf(file_content):
     try:
         pdf_reader = PdfReader(io.BytesIO(file_content))
@@ -28,57 +47,88 @@ def extract_text_from_pdf(file_content):
         print(f"Error reading PDF: {e}")
         return ""
 
+# --- ENDPOINT 1: ANALYZE RESUME ---
 @app.post("/analyze_resume/")
 async def analyze_resume(
     file: UploadFile = File(...), 
-    job_description: str = Form(...)
+    job_description: str = Form(...),
+    db: Session = Depends(get_db)
 ):
-    # 1. Read the PDF
+    # 1. Read File
     content = await file.read()
     resume_text = extract_text_from_pdf(content)
     
     if not resume_text:
         return {"error": "Could not read text from PDF."}
     
-    # 2. Prepare Prompt for Llama 3
-    # We ask for JSON specifically so your frontend can read it easily
+    # 2. Prepare Prompt
     prompt = f"""
-    You are an expert technical recruiter. Analyze this resume against the job description.
+    Act as a strict technical recruiter. Analyze this resume against the job description.
     
-    RESUME:
-    {resume_text[:2000]}  # Truncate to avoid context limits if needed
+    RESUME: {resume_text[:3000]}
+    JOB DESCRIPTION: {job_description}
     
-    JOB DESCRIPTION:
-    {job_description}
-    
-    Provide a professional response. 
-    Strictly format your answer as clean text (not JSON) with these sections:
-    
-    1. MATCH SCORE: (Give a score out of 100)
-    2. MISSING SKILLS: (List key missing skills)
-    3. INTERVIEW QUESTIONS: (List 3 specific questions)
-    4. ADVICE: (One paragraph of advice)
+    IMPORTANT: You must include a line at the very top that says exactly:
+    "MATCH SCORE: XX" (where XX is the number).
+    Then provide the detailed report with Markdown formatting (Bold, Bullets).
     """
 
-    print("Sending to Llama 3...") # Debug log
-
     try:
-        # 3. Call Local Ollama Model
-        response = ollama.chat(model='llama3', messages=[
-            {
-                'role': 'user',
-                'content': prompt,
-            },
-        ])
-        
-        # 4. Extract the answer
+        # 3. Call AI (Phi-3 or Llama-3)
+        print("Analyzing with AI...")
+        response = ollama.chat(model='phi3', messages=[{'role': 'user', 'content': prompt}])
         ai_reply = response['message']['content']
-        return {"analysis": ai_reply}
+        
+        # 4. Extract Score (Regex)
+        score_match = re.search(r"MATCH SCORE:\s*(\d+)", ai_reply)
+        score = int(score_match.group(1)) if score_match else 0
+
+        # 5. Save to Database
+        db_record = models.AnalysisResult(
+            filename=file.filename,
+            job_role=job_description[:50] + "...", 
+            match_score=score,
+            missing_skills="Check Report", 
+            ai_response=ai_reply
+        )
+        db.add(db_record)
+        db.commit()
+        db.refresh(db_record)
+
+        # 6. Return Data (Including resume_text for the rewriter)
+        return {
+            "analysis": ai_reply, 
+            "resume_text": resume_text[:5000], # Send back text for frontend state
+            "saved_id": db_record.id
+        }
 
     except Exception as e:
-        print(f"Llama Error: {e}")
-        return {"error": f"AI Engine Error: {str(e)}"}
+        print(f"Error: {e}")
+        return {"error": str(e)}
 
-@app.get("/")
-def read_root():
-    return {"message": "Career Architect (Llama 3 Edition) is Running!"}
+# --- ENDPOINT 2: HISTORY (DASHBOARD) ---
+@app.get("/history/")
+def get_history(db: Session = Depends(get_db)):
+    return db.query(models.AnalysisResult).order_by(models.AnalysisResult.id.desc()).limit(10).all()
+
+# --- ENDPOINT 3: AI REWRITER ---
+class RewriteRequest(BaseModel):
+    resume_text: str
+    job_description: str
+
+@app.post("/improve_summary/")
+async def improve_summary(request: RewriteRequest):
+    prompt = f"""
+    Act as a professional resume writer.
+    
+    JOB DESCRIPTION: {request.job_description}
+    CANDIDATE RESUME CONTEXT: {request.resume_text[:2000]}
+    
+    TASK: Write a powerful, 3-4 sentence professional summary for this candidate optimized for the job above.
+    OUTPUT: Just the summary text. No intro.
+    """
+    try:
+        response = ollama.chat(model='phi3', messages=[{'role': 'user', 'content': prompt}])
+        return {"improved_summary": response['message']['content']}
+    except Exception as e:
+        return {"error": str(e)}
