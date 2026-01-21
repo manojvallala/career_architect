@@ -1,27 +1,47 @@
 # 🚀 Career Architect AI
 
-A privacy-first, AI-powered resume analyzer built with **React**, **FastAPI**, and **Local LLMs (Llama 3 / Phi-3)**.
+![Version](https://img.shields.io/badge/version-4.0-blue.svg) ![License](https://img.shields.io/badge/license-MIT-green.svg) ![React](https://img.shields.io/badge/frontend-React%20%2B%20Vite-blue) ![FastAPI](https://img.shields.io/badge/backend-FastAPI-green)
 
-## 💡 Overview
-Career Architect AI helps job seekers optimize their resumes by comparing them against specific job descriptions. Unlike standard tools that rely on cloud APIs, this project leverages **Local Inference (Ollama)** to ensure sensitive resume data never leaves the user's device.
+**Career Architect AI** is a next-generation AI-powered career platform that acts as your personal recruiter and career coach. It doesn't just analyze your resume; it listens, talks, finds real jobs, and helps you fix your skill gaps using advanced RAG (Retrieval-Augmented Generation) technology.
+
+---
 
 ## ✨ Key Features
-* **📄 PDF Parsing:** Extracts text seamlessly from PDF resumes.
-* **🧠 Local AI Intelligence:** Uses **Llama 3** (via Ollama) to analyze gaps, assign match scores, and generate interview questions.
-* **🔒 Privacy-Centric:** Zero data leakage; all processing happens on `localhost`.
-* **🎨 Markdown Rendering:** Beautifully formatted reports with bolding and bullet points.
+
+* **📄 AI Resume Analysis:** Upload your PDF resume and get a harsh, recruiter-level critique with a 0-100% match score against any job description.
+* **🧠 RAG Memory System:** Powered by **ChromaDB**, the AI "remembers" your resume details, allowing for deep, context-aware conversations.
+* **🎙️ Voice Interviewer:** Real-time **Speech-to-Text** and **Text-to-Speech** for practicing mock interviews with an AI Recruiter.
+* **🌍 Live Job Search:** Integrated with **JSearch (RapidAPI)** to find *actual* live job listings that match your skills.
+* **✍️ AI Writing Studio:**
+    * **Cover Letter Generator:** Instantly writes persuasive cover letters tailored to specific jobs.
+    * **LinkedIn Optimizer:** Rewrites your experience into viral-ready LinkedIn content.
+* **🔐 Secure Authentication:** Enterprise-grade user management and security via **Clerk**.
+
+---
 
 ## 🛠️ Tech Stack
-* **Frontend:** React.js, Tailwind CSS, Vite
-* **Backend:** Python, FastAPI, Uvicorn
-* **AI Engine:** Ollama (Llama 3 / Phi-3)
 
-## 🚀 How to Run Locally
+### **Frontend**
+* **React + Vite** (Fast, modern UI)
+* **TailwindCSS** (Glassmorphism design)
+* **Framer Motion** (Smooth animations)
+* **Clerk** (Authentication)
+* **Axios** (API Communication)
 
-### 1. Backend Setup
+### **Backend**
+* **FastAPI** (High-performance Python API)
+* **Groq (Llama-3)** (Ultra-fast LLM inference)
+* **ChromaDB** (Vector Database for RAG)
+* **PyMuPDF** (PDF Text Extraction)
+* **Uvicorn** (ASGI Server)
+
+---
+
+## 🚀 Getting Started Locally
+
+Follow these steps to run the "Career Architect" on your own machine.
+
+### **1. Clone the Repository**
 ```bash
-cd backend
-python -m venv venv
-# Activate venv
-pip install -r requirements.txt
-uvicorn main:app --reload
+git clone [https://github.com/manojvallala/career_architect.git](https://github.com/manojvallala/career_architect.git)
+cd career_architect
