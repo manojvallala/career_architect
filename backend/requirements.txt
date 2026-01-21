@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+groq
+chromadb
+sentence-transformers
+pymupdf
+sqlalchemy
+requests
+python-multipart
+pydantic
